@@ -1,0 +1,121 @@
+
+=================================================================================================================
+								Spark Project - Marketing_Analysis 
+=================================================================================================================
+****************************************
+1. Load data and create Spark data frame
+****************************************
+
+import org.apache.spark.sql.SQLContext
+
+val sqlContext = new SQLContext(sc)
+
+val df = sqlContext.read.format("com.databricks.spark.csv").option("header", "true").option("inferSchema", "true").load("/user/kuntalc1_gmail/Spark_Project_Marketing_Analytics/Input_Data/Marketing_Analysis.csv")
+
+df.printSchema
+
+df.show
+
+df.select("age","job","marital","education","default","balance","housing","loan","contact","day","month","duration","campaign","pdays","previous","poutcome","y").show
+
+df.registerTempTable("spark_tbl_Marketing_Analysis")
+
+sqlContext.sql("""select * from spark_tbl_Marketing_Analysis limit 10""").show();
+
+
+=================================================================================================================
+											Spark Transformations 	
+=================================================================================================================
+
+********************************************************************************
+2. Give marketing success rate.(No. of people subscribed / total no. of entries)
+********************************************************************************
+
+val tot_count=df.count()
+
+val reg_success=df.filter("y='yes'").count()
+
+or
+
+val reg_success_sql = sqlContext.sql("select count(*) from Prorject_tbl_Marketing_Analysis where y='yes'").show
+
+val success_rate = tot_count.toFloat/reg_success
+
+val reg_fail=df.filter("y='no'").count()
+
+val fail_rate = tot_count.toFloat/reg_fail
+
+or
+
+val reg_fail_sql = sqlContext.sql("select count(*) from Prorject_tbl_Marketing_Analysis where y='no'")
+
+**************************************************************
+3. Maximum, Mean, and Minimum age of average targeted customer
+**************************************************************
+
+val age_stat = sqlContext.sql("select max(age), min(age), avg(age) from Prorject_tbl_Marketing_Analysis")
+age_stat.show()
+
+**************************************************************************************
+4. Check quality of customers by checking average balance, median balance of customers
+**************************************************************************************
+
+val cust_qual = sqlContext.sql("select percentile_approx(balance, .5),  avg(balance) from Prorject_tbl_Marketing_Analysis")
+cust_qual.show()
+
+
+*************************************************************
+5. Check if age matters in marketing subscription for deposit
+*************************************************************
+
+val age_mktg=sqlContext.sql("select  y, avg(age) from  Prorject_tbl_Marketing_Analysis  group by y")
+age_mktg.show()
+
+
+***************************************************************
+6. Check if marital status mattered for subscription to deposit
+***************************************************************
+
+val marital_mktg=sqlContext.sql("select marital, y, count(marital)  from  Prorject_tbl_Marketing_Analysis  group by marital, y order by y")
+marital_mktg.show()
+
+
+***************************************************************************************
+7. Check if age and marital status together mattered for subscription to deposit scheme
+***************************************************************************************
+val age_mktg_subs=sqlContext.sql("select marital, y, count(marital),avg(age)  from  Prorject_tbl_Marketing_Analysis  group by marital, y order by y")
+age_mktg_subs.show()
+
+
+******************************************************************************
+8. Do feature engineering for column—age and find right age effect on campaign
+******************************************************************************
+
+val age_camp = sqlContext.sql("select y, age, count(y) from  Prorject_tbl_Marketing_Analysis  group by y, age order by y, age")
+age_camp.show()
+
+=================================================================================================================
+											Creating Project_spark_tbl_Marketing_Analysis Table into Hive 	
+=================================================================================================================
+import org.apache.spark.sql.hive.HiveContext
+
+val sqlContextForHive = new org.apache.spark.sql.hive.HiveContext(sc)
+
+sqlContextForHive.sql("""create table Prorject_tbl_Marketing_Analysis as select * from spark_tbl_Marketing_Analysis""")
+
+sqlContext.sql("select * from Prorject_tbl_Marketing_Analysis").show
+
+=================================================================================================================
+											Write spark_tbl_Marketing_Analysis file into hdfs 	
+=================================================================================================================
+
+val selectedData = df.select("age","job","marital","education","default","balance","housing","loan","contact","day","month","duration","campaign","pdays","previous","poutcome","y")
+
+selectedData.write.format("com.databricks.spark.csv").option("header", "true").save("/user/kuntalc1_gmail/Spark_Project_Marketing_Analytics/OutPut_Data/")
+
+
+=================================================================================================================
+											Dropping spark_tbl_Marketing_Analysis Table 	
+=================================================================================================================
+
+sqlContext.sql("""drop table spark_tbl_Marketing_Analysis""")
